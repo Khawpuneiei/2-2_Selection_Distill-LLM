@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "two-quadrant-selection-distill"
+version = "0.1.0"
+description = "Student-weakness and teacher-confidence data selection for math distillation"
+requires-python = ">=3.10"
+readme = "README.md"
+
+[tool.setuptools.packages.find]
+include = ["selection_distill*", "scripts*"]
