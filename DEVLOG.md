@@ -114,3 +114,11 @@ run artifacts remain outside this repository.
   GPU with at least 16 GiB VRAM is recommended for the complete run.
 - No research result or teacher-confidence score was fabricated. Dataset and
   model artifacts remain ignored and local.
+
+### Repository publication
+
+- Published the Apply 2 project on the `main` branch of
+  `Khawpuneiei/2-2_Selection_Distill-LLM`.
+- Verified the remote branch against the pushed commit. Only the 43 Apply 2
+  source, test, template, and Markdown files were included; downloaded data,
+  model artifacts, and the unrelated nested repository were excluded.
