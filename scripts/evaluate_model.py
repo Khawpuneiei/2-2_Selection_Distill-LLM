@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument("--max-length", type=int, default=1024)
     parser.add_argument("--limit", type=int, help="Development-only limit per benchmark")
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--batch-size", type=int, default=32)
     args = parser.parse_args()
     if args.attempts <= 0 or args.max_length <= 0 or args.max_new_tokens <= 0:
         parser.error("attempts, max-length, and max-new-tokens must be positive")
@@ -42,6 +43,8 @@ def main() -> None:
             attempts=args.attempts,
             max_new_tokens=args.max_new_tokens,
             max_length=args.max_length,
+            batch_size=args.batch_size,
+            progress=True,
         )
         concept_metrics = summarize_student_metrics(metrics)
         name = input_path.stem
@@ -55,6 +58,7 @@ def main() -> None:
             "mean_entropy": sum(row["entropy"] for row in metrics) / len(metrics) if metrics else None,
             "mean_loss": sum(row["loss"] for row in metrics) / len(metrics) if metrics else None,
             "supervised_tokens_per_attempt_mean": sum(token_counts) / len(token_counts) if token_counts else None,
+            "hit_token_cap_rate": sum(bool(row.get("hit_token_cap")) for row in metrics) / len(metrics) if metrics else None,
             "repeated_failures": sum(row["repeated_failures"] for row in concept_metrics.values()),
             "concepts": concept_metrics,
         }
@@ -66,6 +70,7 @@ def main() -> None:
         "model_revision": getattr(model.config, "_commit_hash", None),
         "device": str(device),
         "attempts_per_question": args.attempts,
+        "max_new_tokens": args.max_new_tokens,
         "splits": split_summaries,
     }
     write_json(args.output_dir / "evaluation_summary.json", receipt)

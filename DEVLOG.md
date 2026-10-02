@@ -122,3 +122,82 @@ run artifacts remain outside this repository.
 - Verified the remote branch against the pushed commit. Only the 43 Apply 2
   source, test, template, and Markdown files were included; downloaded data,
   model artifacts, and the unrelated nested repository were excluded.
+
+## 2026-10-02 / 2026-10-03 — Local Apply 2 run on the RTX 4060
+
+### Inputs
+
+- Apply 1 finished as a 111-question exploratory teacher run
+  (`mini12h-rtx4060-20261001-230236`, teacher `Qwen/Qwen2.5-Math-7B-Instruct`,
+  8 samples per question) in `Khawpuneiei/Teacher-reliability-Distill-LLM`.
+  Its questions come from GSM8K/MATH/GSM-Plus **test** splits, so they cannot
+  be joined to Apply 2 training rows by ID.
+- Added `scripts/export_apply1_confidence.py` (`selection_distill/apply1.py`,
+  tested): concept-level confidence = mean self-consistency agreement
+  (share of the 8 samples matching the greedy answer), the Apply 1 signal with
+  the best GSM8K/MATH AUROC. GSM-Plus rows are skipped. `teacher_tokens` is
+  the generated-token count (greedy + samples) behind each concept score;
+  prompt tokens are not included.
+- Coverage is thin: GSM8K has 40 teacher questions; each MATH subject has 3.
+
+### Pipeline changes
+
+- `prepare_data`: MATH train contains one exact-duplicate problem; duplicates
+  are now dropped by stable ID and counted in the manifest.
+- `make_subsets`: fixed seeded subsets — profile up to 100 questions per
+  concept (726), GSM8K test 500, MATH test 50 per subject (350), GSM-Plus 500.
+  `--limit` took the first rows, which for MATH would have been all algebra.
+- Batched generation with left padding, a `\nProblem:` stop string, and
+  raw-distribution entropy recorded by a logits processor (no stored scores).
+- Prediction scoring uses the first answer marker (`####`, `\boxed{}`, or
+  "the answer is"). The base model often answers and then rambles into
+  unrelated text, which last-line extraction scored as wrong (GSM8K base 11%
+  → 20% on a 64-question smoke after the fix). References still use the
+  original extractor. A numeric fallback compares the last number in a
+  free-form answer line; an overflow in it crashed the first matrix launch and
+  was fixed with a test.
+- Training: bf16 base, fp32 LoRA weights, configurable target modules. The
+  matrix used LoRA r=16, alpha 32 on all linear projections (matching the
+  Apply 1 mini distillation), lr 2e-4, 4,096 supervised tokens per update.
+- `run_matrix` (resumable driver) and `build_matrix_report` (2×2 map,
+  ablation table, paired bootstrap, per-concept accuracy, median-split
+  sensitivity, token-efficiency figure).
+
+### Run log
+
+- Student profile (Qwen2.5-0.5B base, 3 sampled attempts, 512 new tokens):
+  every concept is "poor" (accuracy 0.04–0.26), so the predeclared
+  thresholds (≤0.50, ≥0.70) leave the good-student column empty. Quadrants:
+  high priority = GSM8K, algebra, number theory, precalculus (9,748 pool
+  rows); delay = counting & probability, geometry, intermediate algebra,
+  prealgebra (3,727 rows).
+- Matrix: base evaluation; 300k tokens × 3 arms × seeds 17/18/19; 100k
+  tokens × 3 arms × seed 17. A 900k budget was planned and dropped by owner
+  request to save time.
+- The first driver process disappeared mid-run (cause not identified); the
+  in-flight evaluation finished and the driver was resumed. The remainder ran
+  from a detached PowerShell runner. Killing that runner's wrapper broke the
+  driver's stdout pipe, so a second runner resumed from receipts. No step
+  was run twice; every arm has a complete training receipt
+  (`completed_token_budget: true`).
+- Training time for the same 300k tokens varied from 3.5 to 28 minutes;
+  host RAM was ~2 GiB free and the trainer was largely paged out.
+  Evaluations took 16–27 minutes per model.
+- A separate Apply 3 queue (`eedi-baseline`, `scripts.run_all
+  --wait-for-gpu`) was found waiting for an idle GPU. It was left untouched.
+
+### Results (full write-up: `docs/apply2-results-2026-10-03.md`)
+
+- Overall accuracy, 300k tokens, mean of 3 seeds: base 17.3%; uniform 23.5%;
+  quadrant-prioritized 22.7%; confidence-weighted 23.5%.
+- Paired bootstrap vs uniform (overall): quadrant −0.8 pts [−2.1, +0.5];
+  confidence-weighted 0.0 [−1.0, +1.0]. Every SFT arm beats base by
+  +5.4 to +6.2 pts with intervals excluding zero.
+- 100k tokens (1 seed) already gives 22.9–23.5% overall for all arms.
+- Conclusion: selective SFT did not beat uniform at this scale. The 2×2 had
+  one populated column, MATH teacher confidence rested on 3 questions per
+  subject, and gold-solution targets leave little room for teacher
+  reliability to matter.
+- Small receipts, figures, and gzipped per-question metrics were copied to
+  `results/apply2-rtx4060-20261003/`. Adapters (404 MB), selections, and the
+  private Apply 1 confidence CSV stay in ignored paths.

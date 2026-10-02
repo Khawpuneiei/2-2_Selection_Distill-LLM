@@ -1,0 +1,118 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B",
+  "adapter": "outputs\\matrix\\adapters\\b100000_s17\\quadrant_prioritized",
+  "model_revision": "060db6499f32faf8b98477b0a26969ef7d8b9987",
+  "device": "cuda",
+  "attempts_per_question": 1,
+  "max_new_tokens": 512,
+  "splits": {
+    "gsm8k_test": {
+      "examples": 500,
+      "attempts": 500,
+      "accuracy": 0.322,
+      "mean_entropy": 0.4460501677840948,
+      "mean_loss": 0.5480933644026518,
+      "supervised_tokens_per_attempt_mean": 121.564,
+      "hit_token_cap_rate": 0.038,
+      "repeated_failures": 339,
+      "concepts": {
+        "gsm8k_word_problem": {
+          "examples": 500,
+          "attempts": 500,
+          "accuracy": 0.322,
+          "mean_entropy": 0.4460501677840948,
+          "mean_loss": 0.5480933644026518,
+          "repeated_failures": 339
+        }
+      }
+    },
+    "math_test": {
+      "examples": 350,
+      "attempts": 350,
+      "accuracy": 0.13142857142857142,
+      "mean_entropy": 0.57304602889078,
+      "mean_loss": 0.7986542216794832,
+      "supervised_tokens_per_attempt_mean": 217.12,
+      "hit_token_cap_rate": 0.22857142857142856,
+      "repeated_failures": 304,
+      "concepts": {
+        "algebra": {
+          "examples": 50,
+          "attempts": 50,
+          "accuracy": 0.24,
+          "mean_entropy": 0.5921138164401054,
+          "mean_loss": 0.767827780842781,
+          "repeated_failures": 38
+        },
+        "counting_and_probability": {
+          "examples": 50,
+          "attempts": 50,
+          "accuracy": 0.08,
+          "mean_entropy": 0.7062139251828193,
+          "mean_loss": 1.0213472110033035,
+          "repeated_failures": 46
+        },
+        "geometry": {
+          "examples": 50,
+          "attempts": 50,
+          "accuracy": 0.06,
+          "mean_entropy": 0.6445396867394447,
+          "mean_loss": 0.8076186710596085,
+          "repeated_failures": 47
+        },
+        "intermediate_algebra": {
+          "examples": 50,
+          "attempts": 50,
+          "accuracy": 0.1,
+          "mean_entropy": 0.5728945428133011,
+          "mean_loss": 0.6224930363893509,
+          "repeated_failures": 45
+        },
+        "number_theory": {
+          "examples": 50,
+          "attempts": 50,
+          "accuracy": 0.14,
+          "mean_entropy": 0.48160612493753435,
+          "mean_loss": 0.9743200242519379,
+          "repeated_failures": 43
+        },
+        "prealgebra": {
+          "examples": 50,
+          "attempts": 50,
+          "accuracy": 0.28,
+          "mean_entropy": 0.5924089135229588,
+          "mean_loss": 0.9161848944425582,
+          "repeated_failures": 36
+        },
+        "precalculus": {
+          "examples": 50,
+          "attempts": 50,
+          "accuracy": 0.02,
+          "mean_entropy": 0.42154519259929657,
+          "mean_loss": 0.48078793376684187,
+          "repeated_failures": 49
+        }
+      }
+    },
+    "gsm_plus_test": {
+      "examples": 500,
+      "attempts": 500,
+      "accuracy": 0.204,
+      "mean_entropy": 0.45853562918305396,
+      "mean_loss": 1.1687280468940735,
+      "supervised_tokens_per_attempt_mean": 116.254,
+      "hit_token_cap_rate": 0.038,
+      "repeated_failures": 398,
+      "concepts": {
+        "gsm8k_word_problem": {
+          "examples": 500,
+          "attempts": 500,
+          "accuracy": 0.204,
+          "mean_entropy": 0.45853562918305396,
+          "mean_loss": 1.1687280468940735,
+          "repeated_failures": 398
+        }
+      }
+    }
+  }
+}

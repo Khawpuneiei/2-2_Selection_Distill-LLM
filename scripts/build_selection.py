@@ -150,6 +150,10 @@ def main() -> None:
             "apply1_teacher_scores": str(args.teacher_scores),
         },
         "arms": arm_stats,
+        "pool_rows_by_quadrant": {
+            quadrant: sum(concept_quadrants[str(row["concept"])] == quadrant for row in attached)
+            for quadrant in ("high_priority", "delay", "low_priority", "exclude")
+        },
         "teacher_scoring_pool": {
             "unique_confidence_records_for_training_pool": len(distinct_pool_score_keys),
             "teacher_tokens_used": sum(pool_score_token_values) if pool_token_receipt_complete else None,

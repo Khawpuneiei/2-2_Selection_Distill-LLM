@@ -13,12 +13,20 @@ by Apply 1; it does not run the 7B teacher itself. See
 
 ## Status
 
-The code, data contracts, run commands, tests, and report pipeline are set up.
-The full research run still needs the Apply 1 confidence CSV and reviewed
-fine-grained GSM8K concept labels. This workspace has an RTX 4060 Laptop GPU
-with 8 GiB VRAM, below the brief's 16–24 GiB estimate. Use the 0.5B student
-for a local smoke run; use the [Vast.ai runbook](docs/vast-ai-runbook.md) for
-the complete three-arm run.
+**Completed local run (2026-10-03).** The 0.5B student was profiled, mapped
+against Apply 1 teacher confidence, and fine-tuned under all three arms
+(300k tokens × 3 seeds, plus 100k × 1 seed) on an RTX 4060 Laptop GPU.
+Selective SFT did **not** beat uniform SFT at this scale: overall accuracy
+was 23.5% (uniform), 22.7% (quadrant-prioritized), and 23.5%
+(confidence-weighted), against 17.3% for the base student. See
+[`docs/apply2-results-2026-10-03.md`](docs/apply2-results-2026-10-03.md) for
+the 2×2 map, ablation table, confidence intervals, token-efficiency plot,
+and limitations. Receipts and figures are in
+[`results/apply2-rtx4060-20261003/`](results/apply2-rtx4060-20261003/).
+
+The local run used the 0.5B student. The 1.5B student and per-example
+teacher scores remain follow-up work; the
+[Vast.ai runbook](docs/vast-ai-runbook.md) covers larger GPUs.
 
 ## Setup on Windows
 

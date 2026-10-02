@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from .metrics import mean_entropy_from_scores
-from .generation_utils import truncate_generation_prompt
+from .generation_utils import (
+    STOP_STRINGS,
+    generated_lengths,
+    left_pad,
+    masked_row_means,
+    trim_generation,
+)
 from .scoring import answers_match
 from .training_utils import encode_supervised_example, format_prompt
 
@@ -59,8 +64,25 @@ def _torch():
     return torch
 
 
-def _generate(
-    question: str,
+class _StepEntropy:
+    """Logits processor that records raw next-token entropy (nats) per step.
+
+    Custom processors run before temperature / top-p warpers, so the entropy is
+    that of the model's unwarped distribution.
+    """
+
+    def __init__(self):
+        self.steps = []
+
+    def __call__(self, input_ids, scores):
+        torch = _torch()
+        log_probs = torch.log_softmax(scores.float(), dim=-1)
+        self.steps.append(-(log_probs.exp() * log_probs).sum(dim=-1))
+        return scores
+
+
+def _generate_batch(
+    questions: list[str],
     model,
     tokenizer,
     device,
@@ -70,34 +92,48 @@ def _generate(
     sample: bool,
     temperature: float,
     top_p: float,
-) -> tuple[str, float]:
+) -> list[tuple[str, float, bool]]:
+    """Generate one continuation per question; return (text, entropy, hit_cap)."""
     torch = _torch()
-    prompt = tokenizer(format_prompt(question), return_tensors="pt", add_special_tokens=True)
-    raw_attention_mask = prompt.get("attention_mask")
-    input_ids, attention_mask = truncate_generation_prompt(
-        prompt["input_ids"].to(device),
-        raw_attention_mask.to(device) if raw_attention_mask is not None else None,
-        max_length=max_length,
-    )
+    from transformers import LogitsProcessorList
+
+    prompts = [tokenizer.encode(format_prompt(question), add_special_tokens=True) for question in questions]
+    input_ids, attention_mask = left_pad(prompts, tokenizer.pad_token_id, max_length=max_length)
+    input_ids = input_ids.to(device)
+    attention_mask = attention_mask.to(device)
+    recorder = _StepEntropy()
     kwargs = {
         "input_ids": input_ids,
         "attention_mask": attention_mask,
         "max_new_tokens": max_new_tokens,
         "do_sample": sample,
-        "return_dict_in_generate": True,
-        "output_scores": True,
         "pad_token_id": tokenizer.pad_token_id,
         "eos_token_id": tokenizer.eos_token_id,
+        "stop_strings": list(STOP_STRINGS),
+        "tokenizer": tokenizer,
+        "logits_processor": LogitsProcessorList([recorder]),
     }
     if sample:
         kwargs["temperature"] = temperature
         kwargs["top_p"] = top_p
+    else:
+        kwargs["temperature"] = None
+        kwargs["top_p"] = None
+        kwargs["top_k"] = None
     with torch.no_grad():
-        generated = model.generate(**kwargs)
-    continuation = generated.sequences[0, input_ids.shape[1] :]
-    answer = tokenizer.decode(continuation, skip_special_tokens=True).strip()
-    entropy = mean_entropy_from_scores(generated.scores or ())
-    return answer, entropy
+        sequences = model.generate(**kwargs)
+    continuations = sequences[:, input_ids.shape[1]:]
+    stop_ids = {tokenizer.pad_token_id, tokenizer.eos_token_id}
+    lengths = generated_lengths(continuations, stop_ids)
+    entropies = masked_row_means(recorder.steps, lengths)
+    results = []
+    for row, length in enumerate(lengths):
+        tokens = continuations[row, :length].tolist()
+        text = tokenizer.decode(tokens, skip_special_tokens=True)
+        hit_cap = length >= max_new_tokens and not any(token in stop_ids for token in tokens)
+        trimmed = trim_generation(text)
+        results.append((trimmed, entropies[row], hit_cap and trimmed == text.strip()))
+    return results
 
 
 def evaluate_rows(
@@ -111,37 +147,60 @@ def evaluate_rows(
     max_length: int = 1024,
     temperature: float = 0.7,
     top_p: float = 0.95,
+    batch_size: int = 16,
+    progress: bool = False,
 ) -> list[dict[str, Any]]:
     if attempts <= 0:
         raise ValueError("attempts must be positive")
-    results: list[dict[str, Any]] = []
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    rows = list(rows)
     for row in rows:
         if not row.get("id") or not row.get("concept"):
             raise ValueError("evaluation rows require id and concept")
         if not row.get("question") or not row.get("solution") or not row.get("answer"):
             raise ValueError(f"evaluation row {row.get('id')} requires question, solution, and answer")
-        loss, supervised_tokens = _question_loss(row, model, tokenizer, device, max_length)
+    tokenizer.padding_side = "left"
+    results: list[dict[str, Any]] = []
+    # Sort by prompt length so batches pad little; output order is restored below.
+    order = sorted(range(len(rows)), key=lambda index: len(rows[index]["question"]))
+    by_index: dict[int, list[dict[str, Any]]] = {}
+    for start in range(0, len(order), batch_size):
+        batch_indices = order[start:start + batch_size]
+        batch = [rows[index] for index in batch_indices]
+        losses = [_question_loss(row, model, tokenizer, device, max_length) for row in batch]
+        per_row: list[list[dict[str, Any]]] = [[] for _ in batch]
         for attempt in range(1, attempts + 1):
-            predicted, entropy = _generate(
-                row["question"], model, tokenizer, device,
+            generations = _generate_batch(
+                [row["question"] for row in batch], model, tokenizer, device,
                 max_new_tokens=max_new_tokens,
                 max_length=max_length,
                 sample=attempts > 1,
                 temperature=temperature,
                 top_p=top_p,
             )
-            results.append(
-                {
-                    "id": str(row["id"]),
-                    "concept": str(row["concept"]),
-                    "dataset": str(row.get("dataset", "")),
-                    "attempt": attempt,
-                    "correct": answers_match(predicted, str(row["answer"])),
-                    "prediction": predicted,
-                    "reference": str(row["answer"]),
-                    "entropy": entropy,
-                    "loss": loss,
-                    "supervised_tokens": supervised_tokens,
-                }
-            )
+            for position, (row, (predicted, entropy, hit_cap)) in enumerate(zip(batch, generations)):
+                loss, supervised_tokens = losses[position]
+                per_row[position].append(
+                    {
+                        "id": str(row["id"]),
+                        "concept": str(row["concept"]),
+                        "dataset": str(row.get("dataset", "")),
+                        "attempt": attempt,
+                        "correct": answers_match(predicted, str(row["answer"])),
+                        "prediction": predicted,
+                        "reference": str(row["answer"]),
+                        "entropy": entropy,
+                        "loss": loss,
+                        "supervised_tokens": supervised_tokens,
+                        "hit_token_cap": hit_cap,
+                    }
+                )
+        for index, records in zip(batch_indices, per_row):
+            by_index[index] = records
+        if progress:
+            done = min(start + batch_size, len(order))
+            print(f"  generated {done}/{len(order)} questions", flush=True)
+    for index in range(len(rows)):
+        results.extend(by_index[index])
     return results

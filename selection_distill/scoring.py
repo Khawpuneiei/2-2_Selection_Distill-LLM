@@ -52,6 +52,39 @@ def extract_final_answer(text: str) -> str:
     return lines[-1] if lines else ""
 
 
+_ANSWER_IS = re.compile(r"(?i)\bthe\s+(?:final\s+)?answer\s+is\s*:?\s*")
+
+
+def extract_prediction_answer(text: str) -> str:
+    """Extract a model's answer from the FIRST answer marker it writes.
+
+    Small base models often state an answer and then keep generating unrelated
+    text, so the earliest ``####``, ``\boxed{}``, or "the answer is" marker is
+    used. References keep using ``extract_final_answer``.
+    """
+    value = str(text).strip()
+    candidates: list[tuple[int, str]] = []
+    gsm_match = re.search(r"####\s*([^\n]+)", value)
+    if gsm_match:
+        candidates.append((gsm_match.start(), gsm_match.group(1).strip()))
+    boxed_index = value.find(r"\boxed")
+    if boxed_index >= 0:
+        start = boxed_index + len(r"\boxed")
+        while start < len(value) and value[start].isspace():
+            start += 1
+        group = _read_braced_group(value, start)
+        if group:
+            candidates.append((boxed_index, group[0].strip()))
+    answer_match = _ANSWER_IS.search(value)
+    if answer_match:
+        line = value[answer_match.end():].split("\n", 1)[0].strip()
+        boxed = _boxed_content(line)
+        candidates.append((answer_match.start(), boxed if boxed is not None else line.rstrip(".")))
+    if candidates:
+        return min(candidates, key=lambda item: item[0])[1]
+    return extract_final_answer(value)
+
+
 def _replace_latex_fractions(text: str) -> str:
     value = text
     while True:
@@ -68,8 +101,8 @@ def _replace_latex_fractions(text: str) -> str:
         value = value[: match.start()] + replacement + value[denominator[1] :]
 
 
-def _normalized_expression(text: str) -> str:
-    value = extract_final_answer(text).strip()
+def _normalized_expression(text: str, *, prediction: bool = False) -> str:
+    value = (extract_prediction_answer(text) if prediction else extract_final_answer(text)).strip()
     value = re.sub(r"\\(?:left|right|displaystyle|quad|qquad)\b", "", value)
     for spacing in (r"\,", r"\;", r"\!"):
         value = value.replace(spacing, "")
@@ -133,7 +166,7 @@ def _safe_numeric_value(expression: str) -> Fraction | float | None:
 
 def answers_match(prediction: str, reference: str, *, tolerance: float = 1e-9) -> bool:
     """Match common numeric / LaTeX scalar forms; otherwise compare normalized text."""
-    predicted = _normalized_expression(prediction)
+    predicted = _normalized_expression(prediction, prediction=True)
     expected = _normalized_expression(reference)
     if not predicted or not expected:
         return False
@@ -146,4 +179,22 @@ def answers_match(prediction: str, reference: str, *, tolerance: float = 1e-9) -
             )
         except (OverflowError, ValueError):
             return predicted_number == expected_number
-    return predicted.casefold() == expected.casefold()
+    if predicted.casefold() == expected.casefold():
+        return True
+    # Free-form answer lines ("The answer is 18."): compare the last number
+    # in the extracted answer when the reference itself is a plain number.
+    if expected_number is not None and predicted_number is None:
+        numbers = _NUMBER.findall(extract_prediction_answer(prediction).replace(",", ""))
+        if numbers:
+            candidate = _safe_numeric_value(numbers[-1])
+            if candidate is not None:
+                try:
+                    return math.isclose(
+                        float(candidate), float(expected_number), rel_tol=tolerance, abs_tol=tolerance
+                    )
+                except (OverflowError, ValueError):
+                    return candidate == expected_number
+    return False
+
+
+_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")

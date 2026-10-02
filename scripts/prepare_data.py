@@ -43,6 +43,18 @@ def _dataset_rows(dataset, limit: int | None):
             yield dataset[index]
 
 
+def _dedupe(rows: list[dict]) -> tuple[list[dict], int]:
+    """Keep the first row per stable ID; source splits contain repeated questions."""
+    seen: set[str] = set()
+    kept: list[dict] = []
+    for row in rows:
+        if row["id"] in seen:
+            continue
+        seen.add(row["id"])
+        kept.append(row)
+    return kept, len(rows) - len(kept)
+
+
 def prepare(output_dir: Path, concept_map_path: str | None, limit_per_config: int | None) -> dict:
     try:
         from datasets import load_dataset
@@ -88,6 +100,13 @@ def prepare(output_dir: Path, concept_map_path: str | None, limit_per_config: in
         row["concept"] = assignments.get(row["seed_id"], row["concept"])
         gsm_plus.append(row)
 
+    duplicates_removed = {}
+    gsm_train, duplicates_removed["gsm8k_train"] = _dedupe(gsm_train)
+    gsm_test, duplicates_removed["gsm8k_test"] = _dedupe(gsm_test)
+    math_train, duplicates_removed["math_train"] = _dedupe(math_train)
+    math_test, duplicates_removed["math_test"] = _dedupe(math_test)
+    gsm_plus, duplicates_removed["gsm_plus_test"] = _dedupe(gsm_plus)
+
     profile, training_pool = split_profile_rows(gsm_train + math_train, fraction=0.10, seed=17)
     output_dir.mkdir(parents=True, exist_ok=True)
     write_jsonl(output_dir / "train_pool.jsonl", training_pool)
@@ -121,6 +140,7 @@ def prepare(output_dir: Path, concept_map_path: str | None, limit_per_config: in
         },
         "concept_map": str(Path(concept_map_path).name) if concept_map_path else None,
         "limit_per_config": limit_per_config,
+        "exact_duplicate_questions_removed": duplicates_removed,
         "counts": {
             "train_pool": len(training_pool),
             "profile": len(profile),

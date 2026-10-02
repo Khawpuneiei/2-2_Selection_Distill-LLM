@@ -1,0 +1,67 @@
+{
+  "sources": {
+    "gsm8k": "openai/gsm8k:main",
+    "math": "EleutherAI/hendrycks_math",
+    "gsm_plus": "qintongli/GSM-Plus (evaluation only)"
+  },
+  "split_policy": "10% stable per-concept holdout from source train splits for initial student profiling; test splits remain evaluation-only",
+  "concept_policy": {
+    "math": "native subject config; native type retained as subconcept",
+    "gsm8k": "gsm8k_word_problem unless overridden by the supplied id,concept map",
+    "gsm_plus": "inherits concept assignment from the GSM8K seed question when available; otherwise gsm8k_word_problem"
+  },
+  "concept_map": null,
+  "limit_per_config": null,
+  "exact_duplicate_questions_removed": {
+    "gsm8k_train": 0,
+    "gsm8k_test": 0,
+    "math_train": 1,
+    "math_test": 0,
+    "gsm_plus_test": 0
+  },
+  "counts": {
+    "train_pool": 13475,
+    "profile": 1497,
+    "gsm8k_test": 1319,
+    "math_test": 5000,
+    "gsm_plus_test": 10552
+  },
+  "concept_counts": {
+    "train_pool": {
+      "algebra": 1569,
+      "counting_and_probability": 694,
+      "geometry": 783,
+      "gsm8k_word_problem": 6726,
+      "intermediate_algebra": 1165,
+      "number_theory": 782,
+      "prealgebra": 1085,
+      "precalculus": 671
+    },
+    "profile": {
+      "algebra": 174,
+      "counting_and_probability": 77,
+      "geometry": 87,
+      "gsm8k_word_problem": 747,
+      "intermediate_algebra": 130,
+      "number_theory": 87,
+      "prealgebra": 120,
+      "precalculus": 75
+    },
+    "gsm8k_test": {
+      "gsm8k_word_problem": 1319
+    },
+    "math_test": {
+      "algebra": 1187,
+      "counting_and_probability": 474,
+      "geometry": 479,
+      "intermediate_algebra": 903,
+      "number_theory": 540,
+      "prealgebra": 871,
+      "precalculus": 546
+    },
+    "gsm_plus_test": {
+      "gsm8k_word_problem": 10552
+    }
+  },
+  "datasets_library_version": "3.6.0"
+}
