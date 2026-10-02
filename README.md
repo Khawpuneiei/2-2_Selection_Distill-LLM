@@ -28,6 +28,61 @@ The local run used the 0.5B student. The 1.5B student and per-example
 teacher scores remain follow-up work; the
 [Vast.ai runbook](docs/vast-ai-runbook.md) covers larger GPUs.
 
+## Results (local run, 2026-10-03)
+
+Student `Qwen/Qwen2.5-0.5B` + LoRA; teacher confidence from the Apply 1 run
+(`Qwen2.5-Math-7B-Instruct`, self-consistency agreement). Test subsets: GSM8K
+500, MATH 350 (50 per subject), GSM-Plus 500 (out-of-distribution, never
+trained on). Every arm gets exactly the same number of student training tokens.
+
+### 2×2 map: student need × teacher confidence
+
+![2×2 map of concepts by student accuracy and teacher confidence](results/apply2-rtx4060-20261003/report/quadrant_heatmap.png)
+
+The student is weak on every concept (4–26% profile accuracy), so under the
+predeclared thresholds (student ≤ 0.50, teacher ≥ 0.70) only the
+poor-student column is filled. **High priority:** GSM8K, algebra, number
+theory, precalculus. **Delay:** counting & probability, geometry,
+intermediate algebra, prealgebra. MATH teacher confidence rests on only 3
+Apply 1 questions per subject.
+
+### Ablation (300k tokens per arm, mean ± sd over 3 seeds)
+
+| Arm | GSM8K | MATH | GSM-Plus (OOD) | Overall |
+| --- | ---: | ---: | ---: | ---: |
+| Base (no SFT) | 22.6 | 15.7 | 13.2 | 17.3 |
+| Uniform | 33.3 ± 0.9 | 13.1 ± 0.5 | **21.1 ± 1.1** | **23.5 ± 0.7** |
+| Quadrant-prioritized | 32.5 ± 2.0 | 12.9 ± 0.5 | 19.9 ± 1.1 | 22.7 ± 1.0 |
+| Confidence-weighted loss | **34.2 ± 0.9** | 12.5 ± 1.3 | 20.6 ± 2.1 | **23.5 ± 1.4** |
+
+![Accuracy by arm and benchmark](results/apply2-rtx4060-20261003/report/ablation_accuracy.png)
+
+Paired bootstrap, overall accuracy (95% CI):
+
+| Comparison | Δ (points) |
+| --- | ---: |
+| Uniform − Base | +6.2 [+4.0, +8.3] |
+| Quadrant-prioritized − Uniform | −0.8 [−2.1, +0.5] |
+| Confidence-weighted − Uniform | 0.0 [−1.0, +1.0] |
+
+### Token efficiency
+
+![Accuracy vs student training tokens and vs teacher tokens](results/apply2-rtx4060-20261003/report/token_efficiency.png)
+
+All arms reach 22.9–23.5% overall within 100k training tokens (1 seed) and
+stay flat to 300k. Apply 2 makes no new teacher calls; the right panel counts
+the Apply 1 teacher tokens behind the confidence scores each arm relies on.
+
+### Takeaways
+
+- Fine-tuning helps GSM8K (+10 to +12 points) and transfers to GSM-Plus
+  (+7 to +8); MATH slips slightly (−3 points) for every arm.
+- **Selective SFT did not beat uniform SFT here.** The 2×2 collapsed to one
+  column, MATH confidence is thin, and gold-solution targets leave little room
+  for teacher reliability to matter.
+- Full tables, per-concept accuracy, threshold sensitivity, and limitations:
+  [`docs/apply2-results-2026-10-03.md`](docs/apply2-results-2026-10-03.md).
+
 ## Setup on Windows
 
 ```powershell
