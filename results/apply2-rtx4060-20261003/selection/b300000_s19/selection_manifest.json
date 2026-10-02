@@ -1,0 +1,64 @@
+{
+  "tokenizer": "Qwen/Qwen2.5-0.5B",
+  "max_length": 1024,
+  "token_budget": 300000,
+  "seed": 19,
+  "thresholds": {
+    "poor_student_accuracy_at_or_below": 0.5,
+    "teacher_confidence_at_or_above": 0.7
+  },
+  "inputs": {
+    "train_pool": "data\\processed\\train_pool.jsonl",
+    "student_profile_metrics": "outputs\\student_profile_metrics.jsonl",
+    "apply1_teacher_scores": "data\\processed\\apply1_confidence.csv"
+  },
+  "arms": {
+    "uniform": {
+      "training_tokens": 300000,
+      "selected_rows": 1256,
+      "unique_examples": 1256,
+      "reused_rows": 0,
+      "truncated_rows": 1,
+      "teacher_tokens_used": 223511,
+      "teacher_token_receipt_complete": true
+    },
+    "quadrant_prioritized": {
+      "training_tokens": 300000,
+      "selected_rows": 1409,
+      "unique_examples": 1409,
+      "reused_rows": 0,
+      "truncated_rows": 1,
+      "teacher_tokens_used": 158318,
+      "teacher_token_receipt_complete": true
+    },
+    "confidence_weighted": {
+      "training_tokens": 300000,
+      "selected_rows": 1256,
+      "unique_examples": 1256,
+      "reused_rows": 0,
+      "truncated_rows": 1,
+      "teacher_tokens_used": 223511,
+      "teacher_token_receipt_complete": true
+    }
+  },
+  "pool_rows_by_quadrant": {
+    "high_priority": 9748,
+    "delay": 3727,
+    "low_priority": 0,
+    "exclude": 0
+  },
+  "teacher_scoring_pool": {
+    "unique_confidence_records_for_training_pool": 8,
+    "teacher_tokens_used": 223511,
+    "token_receipt_complete": true,
+    "apply2_additional_teacher_tokens": 0
+  },
+  "notes": [
+    "Uniform and confidence-weighted arms use the same deterministic sample draw.",
+    "Quadrant-prioritized uses only poor-student, confident-teacher examples.",
+    "Confidence weights are teacher confidence divided by the pool mean confidence.",
+    "Repeated examples and the final partial example are marked in the arm JSONL files.",
+    "Teacher token cost is null unless every distinct score record used has a teacher_tokens receipt.",
+    "The shared teacher-scoring-pool total is reported once; Apply 2 reuses these saved records and adds zero teacher queries."
+  ]
+}

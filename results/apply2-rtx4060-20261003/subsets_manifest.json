@@ -1,0 +1,53 @@
+{
+  "seed": 2026,
+  "source_dir": "data\\processed",
+  "subsets": {
+    "profile": {
+      "rows": 726,
+      "concepts": {
+        "algebra": 100,
+        "counting_and_probability": 77,
+        "geometry": 87,
+        "gsm8k_word_problem": 100,
+        "intermediate_algebra": 100,
+        "number_theory": 87,
+        "prealgebra": 100,
+        "precalculus": 75
+      }
+    },
+    "gsm8k_test": {
+      "rows": 500,
+      "concepts": {
+        "gsm8k_word_problem": 500
+      }
+    },
+    "math_test": {
+      "rows": 350,
+      "concepts": {
+        "algebra": 50,
+        "counting_and_probability": 50,
+        "geometry": 50,
+        "intermediate_algebra": 50,
+        "number_theory": 50,
+        "prealgebra": 50,
+        "precalculus": 50
+      }
+    },
+    "gsm_plus_test": {
+      "rows": 500,
+      "concepts": {
+        "gsm8k_word_problem": 500
+      },
+      "perturbation_types": {
+        "adding operation": 65,
+        "critical thinking": 63,
+        "digit expansion": 68,
+        "distraction insertion": 58,
+        "integer-decimal-fraction conversion": 57,
+        "numerical substitution": 60,
+        "problem understanding": 59,
+        "reversing operation": 70
+      }
+    }
+  }
+}
