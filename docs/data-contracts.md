@@ -40,6 +40,14 @@ CSV columns: `id,concept,confidence,teacher_tokens`.
   quadrant confidence.
 - A blank `teacher_tokens` field is an unknown receipt, not zero.
 
+`python -m scripts.export_apply1_confidence --predictions <run>/predictions.jsonl`
+builds this CSV from an Apply 1 teacher-reliability run. It writes one
+concept-level row per GSM8K/MATH concept: `confidence` is the mean
+self-consistency agreement (`greedy_agreement_share`, or
+`--signal majority_vote_share`), and `teacher_tokens` counts the generated
+tokens (greedy + samples) behind that score. GSM-Plus rows are skipped. Extra
+columns `apply1_questions` and `apply1_greedy_accuracy` are informational.
+
 A blank header template is tracked at
 [`data/templates/teacher_scores.csv`](../data/templates/teacher_scores.csv).
 

@@ -25,6 +25,7 @@ def train_lora_arm(
     lora_alpha: int = 16,
     seed: int = 17,
     max_updates: int | None = None,
+    target_modules: tuple[str, ...] = ("q_proj", "v_proj"),
 ) -> dict[str, Any]:
     if not rows:
         raise ValueError("the selected SFT arm is empty")
@@ -41,7 +42,10 @@ def train_lora_arm(
         ) from exc
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dtype = torch.float16 if device.type == "cuda" else torch.float32
+    if device.type == "cuda":
+        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    else:
+        dtype = torch.float32
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -54,11 +58,15 @@ def train_lora_arm(
         r=lora_rank,
         lora_alpha=lora_alpha,
         lora_dropout=0.05,
-        target_modules=["q_proj", "v_proj"],
+        target_modules=list(target_modules),
         task_type=TaskType.CAUSAL_LM,
         bias="none",
     )
     model = get_peft_model(model, config)
+    # Keep the frozen base in half precision but train the adapter in fp32.
+    for parameter in model.parameters():
+        if parameter.requires_grad:
+            parameter.data = parameter.data.float()
     model.to(device)
     trainable_parameters = sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
     if trainable_parameters == 0:
@@ -92,6 +100,7 @@ def train_lora_arm(
         "model_revision": base_revision,
         "adapter_dir": str(output_path),
         "device": str(device),
+        "base_dtype": str(dtype),
         "gpu_name": gpu_name,
         "gpu_peak_allocated_bytes": gpu_memory_bytes,
         "python": platform.python_version(),
@@ -103,7 +112,8 @@ def train_lora_arm(
         "lora": {
             "rank": lora_rank,
             "alpha": lora_alpha,
-            "target_modules": ["q_proj", "v_proj"],
+            "target_modules": list(target_modules),
+            "adapter_dtype": "float32",
             "trainable_parameters": trainable_parameters,
         },
         "learning_rate": learning_rate,

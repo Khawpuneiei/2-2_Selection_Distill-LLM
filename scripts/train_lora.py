@@ -19,6 +19,10 @@ def main() -> None:
     parser.add_argument("--lora-rank", type=int, default=8)
     parser.add_argument("--lora-alpha", type=int, default=16)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument(
+        "--target-modules", nargs="+", default=["q_proj", "v_proj"],
+        help="LoRA target projections, e.g. q_proj k_proj v_proj o_proj gate_proj up_proj down_proj",
+    )
     parser.add_argument("--max-updates", type=int, help="Development smoke cap; marks incomplete runs")
     args = parser.parse_args()
     if args.max_length <= 0 or args.tokens_per_update <= 0:
@@ -48,6 +52,7 @@ def main() -> None:
         lora_alpha=args.lora_alpha,
         seed=args.seed,
         max_updates=args.max_updates,
+        target_modules=tuple(args.target_modules),
     )
     print(
         f"Saved {summary['arm']} adapter to {summary['adapter_dir']}; "

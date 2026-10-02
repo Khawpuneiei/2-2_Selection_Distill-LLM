@@ -22,6 +22,7 @@ def main() -> None:
     parser.add_argument("--top-p", type=float, default=0.95)
     parser.add_argument("--limit", type=int, help="Development-only limit on profile questions")
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--batch-size", type=int, default=32)
     args = parser.parse_args()
     if args.attempts <= 0 or args.max_length <= 0 or args.max_new_tokens <= 0:
         parser.error("attempts, max-length, and max-new-tokens must be positive")
@@ -44,6 +45,8 @@ def main() -> None:
         max_length=args.max_length,
         temperature=args.temperature,
         top_p=args.top_p,
+        batch_size=args.batch_size,
+        progress=True,
     )
     summary = {
         "model": args.model,
